@@ -17,15 +17,14 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.client.model.SimpleModelState;
-import net.minecraftforge.client.model.data.ModelData;
 import net.minecraftforge.registries.ForgeRegistries;
 import vectorwing.farmersdelight.FarmersDelight;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import vectorwing.farmersdelight.common.registry.ModItems;
 
 import java.util.*;
+import java.util.stream.Stream;
 
 /**
  * Credits to the Botania Team for the class reference!
@@ -114,8 +113,7 @@ public class SkilletModel implements BakedModel
 
 	private static class CompositeBakedModel extends WrappedItemModel<BakedModel>
 	{
-		private final List<BakedQuad> genQuads = new ArrayList<>();
-		private final Map<Direction, List<BakedQuad>> faceQuads = new EnumMap<>(Direction.class);
+		private final List<BakedModel> passes;
 
 		public CompositeBakedModel(ModelBakery bakery, ItemStack ingredientStack, BakedModel skillet) {
 			super(skillet);
@@ -138,27 +136,13 @@ public class SkilletModel implements BakedModel
 				ingredientBaked = ingredientUnbaked.bake(bakery, Material::sprite, transform, name);
 			}
 
-			for (Direction e : Direction.values()) {
-				faceQuads.put(e, new ArrayList<>());
-			}
-
-			RandomSource rand = RandomSource.create(0);
-			for (BakedModel pass : ingredientBaked.getRenderPasses(ingredientStack, false)) {
-				genQuads.addAll(pass.getQuads(null, null, rand, ModelData.EMPTY, null));
-
-				for (Direction e : Direction.values()) {
-					rand.setSeed(0);
-					faceQuads.get(e).addAll(pass.getQuads(null, e, rand, ModelData.EMPTY, null));
-				}
-			}
-
-			for (BakedModel pass : skillet.getRenderPasses(ModItems.SKILLET.get().getDefaultInstance(), false)) {
-				rand.setSeed(0);
-				genQuads.addAll(pass.getQuads(null, null, rand, ModelData.EMPTY, null));
-				for (Direction e : Direction.values()) {
-					rand.setSeed(0);
-					faceQuads.get(e).addAll(pass.getQuads(null, e, rand, ModelData.EMPTY, null));
-				}
+			if (ingredientBaked != null) {
+				passes = Stream.concat(
+						Stream.of(originalModel),
+						ingredientBaked.getRenderPasses(ingredientStack, false).stream()
+				).toList();
+			} else {
+				passes = List.of(originalModel);
 			}
 		}
 
@@ -167,10 +151,9 @@ public class SkilletModel implements BakedModel
 			return originalModel.isCustomRenderer();
 		}
 
-		@Nonnull
 		@Override
-		public List<BakedQuad> getQuads(@Nullable BlockState state, @Nullable Direction face, @Nonnull RandomSource rand) {
-			return face == null ? genQuads : faceQuads.get(face);
+		public List<BakedModel> getRenderPasses(ItemStack itemStack, boolean fabulous) {
+			return passes;
 		}
 
 		@Override
